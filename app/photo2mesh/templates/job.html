@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ job.original_name }} - photo2mesh</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body data-job-id="{{ job.id }}">
+  <main class="shell">
+    <section class="panel compact">
+      <a class="back" href="{{ url_for('index') }}">戻る</a>
+      <p class="eyebrow">Job {{ job.id }}</p>
+      <h1>{{ job.original_name }}</h1>
+      <p>
+        状態:
+        <strong id="job-status" class="status {{ job.status }}">{{ job.status }}</strong>
+      </p>
+      <p id="job-error" class="error{% if not job.error %} hidden{% endif %}">{{ job.error }}</p>
+      <div class="mask-tool">
+        <div class="image-stage" id="image-stage">
+          <img id="source-image" src="{{ url_for('job_image', job_id=job.id) }}" alt="{{ job.original_name }}">
+          <img id="mask-preview" class="mask-preview{% if not mask_exists %} hidden{% endif %}" src="{{ url_for('job_mask', job_id=job.id) if mask_exists else '' }}" alt="mask preview">
+          <span id="click-marker" class="click-marker hidden"></span>
+        </div>
+        <p class="muted">メッシュ化したい物体を1クリックしてください。</p>
+      </div>
+      <div class="actions">
+        <button id="mask-button" type="button" class="button secondary disabled">クリック位置で生成</button>
+        <a id="download-link" class="button{% if job.status != 'finished' %} disabled{% endif %}" href="{{ url_for('download_job', job_id=job.id) }}">PLY をダウンロード</a>
+        <a id="log-link" class="button secondary" href="{{ url_for('job_log', job_id=job.id) }}">ログを見る</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

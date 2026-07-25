@@ -1,0 +1,129 @@
+# photo2mesh
+
+写真をアップロードし、WSL 内の `sam3d-blackwell` conda 環境で SAM3D を実行して PLY モデルを生成するローカル Web アプリです。
+
+## 起動
+
+1. `start.bat` をダブルクリックします。
+2. 初回のみ `.venv` を作成し、`requirements.txt` の依存関係をインストールします。
+3. ブラウザで `http://127.0.0.1:7860` を開きます。
+
+## SAM3D コマンド設定
+
+既定では、WSL から見たプロジェクトパスを `/mnt/e/Program/photo2mesh` として扱います。
+この値は [app/photo2mesh/config.py](app/photo2mesh/config.py) の `WSL_PROJECT_ROOT` で管理しています。
+
+写真をアップロードした後、詳細画面でメッシュ化したい物体を1クリックします。クリック座標は Meta Segment Anything に渡され、`storage/jobs/<job_id>/masks/0.png` に mask が作られます。その後、その mask を使って SAM3D が PLY を生成します。
+
+## Segment Anything 設定
+
+ワンクリック mask 作成には、WSL 側の `sam3d-blackwell` conda 環境で `segment_anything` が import できる必要があります。
+
+`E:\Program\sam3D\checkpoints` は SAM3D 本体の checkpoint 置き場です。
+WSL からは `/mnt/e/Program/sam3D/checkpoints` として参照します。
+
+一方、ワンクリック mask 作成には Segment Anything 用の checkpoint も別途必要です。
+既定の SAM checkpoint は次のパスです。
+
+```bash
+/mnt/e/Program/sam3D/checkpoints/sam_vit_h_4b8939.pth
+```
+
+Windows 側では、次の場所に置いてください。
+
+```text
+E:\Program\sam3D\checkpoints\sam_vit_h_4b8939.pth
+```
+
+このファイルがない場合、mask 作成は `SAM checkpoint for one-click masking was not found` で失敗します。
+
+必要に応じて Windows 側で以下を設定してから `start.bat` を起動してください。
+
+```bat
+set SAM_CHECKPOINT=/mnt/e/Program/sam3D/checkpoints/sam_vit_h_4b8939.pth
+set SAM_MODEL_TYPE=vit_h
+set SAM_DEVICE=cuda
+```
+
+既定では次のコマンドを WSL 内で実行します。
+
+```bash
+python "/mnt/e/Program/photo2mesh/app/sam3d_worker/create_mask_from_click.py" --image "{input}" --output "{mask_file}" --x {point_x} --y {point_y} --checkpoint "/mnt/e/Program/sam3D/checkpoints/sam_vit_h_4b8939.pth" --model-type "vit_h" --device "cuda"
+python "/mnt/e/Program/photo2mesh/app/sam3d_worker/run_sam3d_from_image.py" --image "{input}" --output "{output}" --project-root "/home/gonsgon/sam3D/sam-3d-objects" --mask-source "{mask}"
+```
+
+環境に合わせて変更したい場合は、Windows 側で以下の環境変数を設定してから `start.bat` を起動してください。
+
+```bat
+set PHOTO2MESH_WSL_PROJECT_ROOT=/mnt/e/Program/photo2mesh
+set SAM_MASK_COMMAND_TEMPLATE=python "{wsl_project_root}/app/sam3d_worker/create_mask_from_click.py" --image "{input}" --output "{mask_file}" --x {point_x} --y {point_y} --checkpoint "{sam_checkpoint}" --model-type "{sam_model_type}" --device "{sam_device}"
+set SAM3D_COMMAND_TEMPLATE=python "{wsl_project_root}/app/sam3d_worker/run_sam3d_from_image.py" --image "{input}" --output "{output}" --project-root "{wsl_project_root}" --mask-source "{mask}"
+```
+
+使用できるプレースホルダー:
+
+- `{input}`: WSL 形式のアップロード画像パス
+- `{output}`: WSL 形式の出力 PLY パス
+- `{mask}`: WSL 形式の mask フォルダパス
+- `{mask_file}`: WSL 形式の mask PNG パス
+- `{point_x}`: 元画像ピクセルでのクリック横位置
+- `{point_y}`: 元画像ピクセルでのクリック縦位置
+- `{wsl_project_root}`: WSL 形式のプロジェクトルート。既定値は `/mnt/e/Program/photo2mesh`
+
+必要に応じて以下も変更できます。
+
+- `SAM3D_CONDA_ENV`: conda 環境名。既定値は `sam3d-blackwell`
+- `SAM3D_WORKDIR`: WSL 内でコマンド実行前に移動するディレクトリ
+- `SAM3D_CODE_ROOT`: WSL 内の SAM3D コードルート。既定値は `/home/gonsgon/sam3D/sam-3d-objects`
+- `SAM3D_CHECKPOINT_ROOT`: WSL 内の SAM3D checkpoint ルート。既定値は `/mnt/e/Program/sam3D/checkpoints`
+- `SAM_CHECKPOINT`: Segment Anything の checkpoint パス
+- `SAM_MODEL_TYPE`: Segment Anything のモデル種類。既定値は `vit_h`
+- `SAM_DEVICE`: Segment Anything の実行デバイス。既定値は `cuda`
+- `PHOTO2MESH_WINDOWS_PROJECT_ROOT`: Windows 側のプロジェクトルート。既定値はこのフォルダ
+- `PHOTO2MESH_WSL_PROJECT_ROOT`: WSL から見たプロジェクトルート。既定値は `/mnt/e/Program/photo2mesh`
+- `PHOTO2MESH_HOST`: Web サーバのホスト。既定値は `127.0.0.1`
+- `PHOTO2MESH_PORT`: Web サーバのポート。既定値は `7860`
+
+## SAM3D 実行スクリプト
+
+[app/sam3d_worker/run_sam3d_from_image.py](app/sam3d_worker/run_sam3d_from_image.py) が、`app/demo.py` と同じ流れで SAM3D を呼び出します。
+
+1. `notebook/inference.py` から `Inference`, `load_image`, `load_single_mask` を読み込みます。
+2. `checkpoints/hf/pipeline.yaml` を使ってモデルを読み込みます。
+3. Segment Anything が作成した `storage/jobs/<job_id>/masks/` を `load_single_mask(..., index=0)` に渡します。
+4. `output["glb"]` を PLY として保存します。
+
+## 生成物
+
+アップロード画像、ログ、mask は `storage/jobs/<job_id>/` に保存されます。PLY はプロジェクト直下の `output/<job_id>.ply` に保存されます。`storage/`、`output/*.ply`、`.venv/` は Git 管理対象外です。
+
+## ログ
+
+コンソール出力とプログラムログは `logs/` に保存されます。
+
+- `logs/start_*.log`: `start.bat` の起動ログと Flask のコンソール出力
+- `logs/app_*.log`: Flask アプリ内のプログラムログ
+
+ログは種類ごとに直近5件だけ残します。古いログは起動時に自動で削除されます。
+
+## Codex 向けルール
+
+Codex 向けの永続指示は、プロジェクト直下の `AGENTS.md` に置いています。
+
+- 更新のたびに、この `README.md` へ変更内容を追記または更新します。
+- コード内コメントは、中学生でも処理の目的が分かるくらいの言葉で書きます。
+- 関数には docstring を付け、`Args` と `Returns` を必ず記載します。
+
+## 更新履歴
+
+- 2026-07-25: spconv の実行時ビルドで `cublasLt.h` / `nvcc` が見つからない問題に対応するため、WSL 実行時に CUDA bin/include/library パスを明示設定。
+- 2026-07-25: SAM3D のコードルートを `/home/gonsgon/sam3D/sam-3d-objects`、checkpoint ルートを `/mnt/e/Program/sam3D/checkpoints` に合わせて設定。
+- 2026-07-25: SAM/SAM3D 失敗時にログ末尾を画面へ出すようにし、conda 初期化の探索先を追加。
+- 2026-07-25: `wslpath` 変換エラーを避けるため、既知の Windows/WSL プロジェクトルートから WSL パスを組み立てる方式に変更。
+- 2026-07-25: `AGENTS.md` を日本語化し、補助メモ用の `ai/README.md` を削除。
+- 2026-07-25: Codex の公式仕様に合わせ、プロジェクト直下に `AGENTS.md` を追加。
+- 2026-07-25: `logs/` フォルダへコンソール出力とプログラムログを保存し、直近5件だけ残す仕組みを追加。
+- 2026-07-25: `start.bat` が日本語コメントの文字コードで閉じる問題を避けるため、ASCII のみの内容に変更し、`start.log` を出力するように更新。
+- 2026-07-25: Web画面で画像を1クリックし、Meta Segment Anything で object mask を作成してから SAM3D を実行する流れを追加。
+- 2026-07-25: `sam3d.run` の仮コマンドをやめ、`demo.py` 参考の `run_sam3d_from_image.py` を追加。WSL プロジェクトパス設定と `output/` 出力に対応。
+- 2026-07-25: Codex 向けルールを追加し、Web アプリ本体へコメントと docstring を追加。

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>photo2mesh</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div>
+        <p class="eyebrow">SAM3D PLY generator</p>
+        <h1>写真からメッシュを生成</h1>
+      </div>
+
+      {% if error %}
+      <p class="error">{{ error }}</p>
+      {% endif %}
+
+      <form class="upload" action="{{ url_for('submit_job') }}" method="post" enctype="multipart/form-data">
+        <label class="dropzone">
+          <input type="file" name="photo" accept="image/*" required>
+          <span>写真を選択</span>
+          <small>PNG / JPG / WEBP / BMP / TIFF</small>
+        </label>
+        <button type="submit">生成開始</button>
+      </form>
+    </section>
+
+    <section class="history">
+      <h2>ジョブ履歴</h2>
+      {% if jobs %}
+      <div class="job-list">
+        {% for job in jobs %}
+        <a class="job-row" href="{{ url_for('job_detail', job_id=job.id) }}">
+          <span>{{ job.original_name }}</span>
+          <strong class="status {{ job.status }}">{{ job.status }}</strong>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">まだジョブはありません。</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>
