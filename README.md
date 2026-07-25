@@ -97,6 +97,12 @@ set SAM3D_COMMAND_TEMPLATE=python "{wsl_project_root}/app/sam3d_worker/run_sam3d
 
 アップロード画像、ログ、mask は `storage/jobs/<job_id>/` に保存されます。PLY はプロジェクト直下の `output/<job_id>.ply` に保存されます。`storage/`、`output/*.ply`、`.venv/` は Git 管理対象外です。
 
+## マイモデル
+
+トップ画面と `/models` では、`output/` にある PLY ファイルを「マイモデル」として一覧表示します。
+
+各モデルのサムネイルは、PLY の頂点と色を読み取り、画面いっぱいに収まるように自動で投影して `storage/thumbnails/<model_id>.png` に保存します。サムネイル画像をクリックすると、対応する PLY ファイルをダウンロードできます。
+
 ## ログ
 
 コンソール出力とプログラムログは `logs/` に保存されます。
@@ -105,6 +111,18 @@ set SAM3D_COMMAND_TEMPLATE=python "{wsl_project_root}/app/sam3d_worker/run_sam3d
 - `logs/app_*.log`: Flask アプリ内のプログラムログ
 
 ログは種類ごとに直近5件だけ残します。古いログは起動時に自動で削除されます。
+
+## 実行状況の見える化
+
+`start.bat` は Flask のコンソール出力を画面に表示しつつ、同じ内容を `logs/start_*.log` に UTF-8 で保存します。
+
+写真をクリックして SAM/SAM3D を開始すると、ジョブごとに別のコンソール画面が開きます。この画面には、WSL 起動、conda activate、Segment Anything の mask 作成、SAM3D 実行の進行状況が表示されます。同じ内容は `storage/jobs/<job_id>/sam3d.log` にも保存されます。
+
+別画面を出したくない場合は、Windows 側で以下を設定してから起動してください。
+
+```bat
+set SAM_VISIBLE_CONSOLE=0
+```
 
 ## Codex 向けルール
 
@@ -116,6 +134,10 @@ Codex 向けの永続指示は、プロジェクト直下の `AGENTS.md` に置�
 
 ## 更新履歴
 
+- 2026-07-25: `output/` の PLY を「マイモデル」として一覧表示し、PLY からサムネイル PNG を自動生成してクリックでダウンロードできるように更新。
+- 2026-07-25: Web UI をさらにモダンなダークテーマへ調整し、ナビゲーション、モデルギャラリー、ジョブ履歴の見た目を統一。
+- 2026-07-25: Web UI をダークモードのモダンなデザインへ更新し、状態表示やアップロード領域を見やすく調整。
+- 2026-07-25: `start.bat` と SAM/SAM3D ジョブの進行状況をコンソールに表示し、WSL/conda/SAM/SAM3D のステップを見える化。
 - 2026-07-25: spconv の実行時ビルドで `cublasLt.h` / `nvcc` が見つからない問題に対応するため、WSL 実行時に CUDA bin/include/library パスを明示設定。
 - 2026-07-25: SAM3D のコードルートを `/home/gonsgon/sam3D/sam-3d-objects`、checkpoint ルートを `/mnt/e/Program/sam3D/checkpoints` に合わせて設定。
 - 2026-07-25: SAM/SAM3D 失敗時にログ末尾を画面へ出すようにし、conda 初期化の探索先を追加。

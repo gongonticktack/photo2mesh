@@ -9,14 +9,27 @@
 </head>
 <body data-job-id="{{ job.id }}">
   <main class="shell">
+    <header class="app-header">
+      <a class="brand" href="{{ url_for('index') }}">
+        <span class="brand-mark"></span>
+        <span>photo2mesh</span>
+      </a>
+      <nav class="nav-links">
+        <a href="{{ url_for('index') }}">生成</a>
+        <a href="{{ url_for('models_index') }}">マイモデル</a>
+      </nav>
+    </header>
+
     <section class="panel compact">
       <a class="back" href="{{ url_for('index') }}">戻る</a>
-      <p class="eyebrow">Job {{ job.id }}</p>
-      <h1>{{ job.original_name }}</h1>
-      <p>
-        状態:
+      <div class="section-head">
+        <p class="eyebrow">Job {{ job.id }}</p>
+        <h1>{{ job.original_name }}</h1>
+      </div>
+      <div class="state-line">
+        <span>状態</span>
         <strong id="job-status" class="status {{ job.status }}">{{ job.status }}</strong>
-      </p>
+      </div>
       <p id="job-error" class="error{% if not job.error %} hidden{% endif %}">{{ job.error }}</p>
       <div class="mask-tool">
         <div class="image-stage" id="image-stage">

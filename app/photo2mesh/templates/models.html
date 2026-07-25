@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>マイモデル - photo2mesh</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <header class="app-header">
+      <a class="brand" href="{{ url_for('index') }}">
+        <span class="brand-mark"></span>
+        <span>photo2mesh</span>
+      </a>
+      <nav class="nav-links">
+        <a href="{{ url_for('index') }}">生成</a>
+        <a href="{{ url_for('models_index') }}">マイモデル</a>
+      </nav>
+    </header>
+
+    <section class="panel">
+      <div class="section-head">
+        <p class="eyebrow">My Models</p>
+        <h1>マイモデル</h1>
+        <p class="lead">生成済みの PLY をサムネイルで確認できます。画像をクリックすると PLY をダウンロードします。</p>
+      </div>
+
+      {% if models %}
+      <div class="gallery-toolbar">
+        <span>{{ models|length }} models</span>
+        <a class="button secondary" href="{{ url_for('index') }}">新しく生成</a>
+      </div>
+      <div class="model-grid full">
+        {% for model in models %}
+        <a class="model-tile" href="{{ url_for('model_download', model_id=model.id) }}">
+          <img src="{{ url_for('model_thumbnail', model_id=model.id) }}" alt="{{ model.name }}">
+          <span class="model-title">{{ model.name }}</span>
+          <span class="model-action">PLY をダウンロード</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">まだ生成済みモデルはありません。</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

@@ -70,21 +70,12 @@ def run_job(job: Job, point_x: int, point_y: int) -> None:
             sam3d_code_root=config.SAM3D_CODE_ROOT,
             sam3d_checkpoint_root=config.SAM3D_CHECKPOINT_ROOT,
         )
-        shell_script = _build_shell_script(workdir_wsl, mask_command, sam3d_command)
+        shell_script = _build_shell_script(workdir_wsl, mask_command, sam3d_command, job.id)
 
-        # SAM と SAM3D の出力は、後から画面で見られるようログに残します。
-        with log_path.open("w", encoding="utf-8") as log_file:
-            log_file.write("$ " + shell_script + "\n\n")
-            log_file.flush()
-            mark_queued(job)
-            mark_running(job)
-            process = subprocess.run(
-                ["wsl.exe", "bash", "-lc", shell_script],
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-        )
+        _write_visible_runner(log_path, shell_script)
+        mark_queued(job)
+        mark_running(job)
+        process = _run_shell_script(log_path)
 
         if process.returncode != 0:
             log_tail = _read_log_tail(log_path)
@@ -135,13 +126,14 @@ def _to_wsl_path(path: Path) -> str:
     return result.stdout.strip()
 
 
-def _build_shell_script(workdir_wsl: str, mask_command: str, sam3d_command: str) -> str:
+def _build_shell_script(workdir_wsl: str, mask_command: str, sam3d_command: str, job_id: str) -> str:
     """WSL で実行する bash コマンドを組み立てます。
 
     Args:
         workdir_wsl: WSL 内で移動する作業フォルダ。
         mask_command: conda を有効化した後に実行する SAM マスク作成コマンド。
         sam3d_command: mask 作成後に実行する SAM3D コマンド。
+        job_id: 表示用のジョブID。
     Returns:
         str: `bash -lc` に渡す1本のコマンド文字列。
     """
@@ -149,18 +141,109 @@ def _build_shell_script(workdir_wsl: str, mask_command: str, sam3d_command: str)
     conda_env = shlex.quote(config.SAM3D_CONDA_ENV)
     workdir = shlex.quote(workdir_wsl)
 
-    # conda の場所が少し違っても見つかるよう、よくある場所を順番に試します。
+    # 何をしているかが画面で分かるよう、各ステップで echo を出します。
     return " && ".join(
         [
             "set -e",
+            f"echo '[photo2mesh] Job: {shlex.quote(job_id)}'",
+            "echo '[photo2mesh] WSL started.'",
             _build_conda_setup(conda_env),
+            f"echo '[photo2mesh] Conda activated: {conda_env}'",
             _build_cuda_env(),
+            "echo '[photo2mesh] CUDA environment prepared.'",
             f"mkdir -p {workdir}",
             f"cd {workdir}",
+            "echo '[photo2mesh] Creating one-click mask with Segment Anything...'",
             mask_command,
+            "echo '[photo2mesh] Mask created.'",
+            "echo '[photo2mesh] Running SAM3D reconstruction...'",
             sam3d_command,
+            "echo '[photo2mesh] SAM3D finished.'",
         ]
     )
+
+
+def _write_visible_runner(log_path: Path, shell_script: str) -> None:
+    """WSL で動かす shell script と、表示用 bat を作ります。
+
+    Args:
+        log_path: ジョブのログファイル。
+        shell_script: WSL の bash で実行する処理。
+    Returns:
+        None: 実行用ファイルを作るだけで、値は返しません。
+    """
+
+    job_dir = log_path.parent
+    shell_path = job_dir / "run_sam3d.sh"
+    batch_path = job_dir / "run_visible.bat"
+    shell_log_path = _to_wsl_path(log_path)
+    shell_path_wsl = _to_wsl_path(shell_path)
+
+    # tee を使うと、WSL の画面表示とログ保存を同時にできます。
+    shell_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                f"exec > >(tee -a {shlex.quote(shell_log_path)}) 2>&1",
+                "echo '[photo2mesh] ===== SAM/SAM3D job started ====='",
+                shell_script,
+                "echo '[photo2mesh] ===== SAM/SAM3D job completed ====='",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    batch_path.write_text(
+        "\n".join(
+            [
+                "@echo off",
+                "title photo2mesh SAM/SAM3D job",
+                "echo Starting visible WSL SAM/SAM3D job...",
+                f"echo Log file: {log_path}",
+                f"wsl.exe bash {shell_path_wsl}",
+                "set EXIT_CODE=%ERRORLEVEL%",
+                "echo.",
+                "echo SAM/SAM3D window finished with exit code %EXIT_CODE%.",
+                "echo This window will close in 15 seconds.",
+                "timeout /t 15",
+                "exit /b %EXIT_CODE%",
+                "",
+            ]
+        ),
+        encoding="ascii",
+    )
+    log_path.write_text(
+        "\n".join(
+            [
+                "[photo2mesh] Prepared visible SAM/SAM3D runner.",
+                f"[photo2mesh] Windows runner: {batch_path}",
+                f"[photo2mesh] WSL runner: {shell_path_wsl}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _run_shell_script(log_path: Path) -> subprocess.CompletedProcess:
+    """SAM/SAM3D の shell script を実行します。
+
+    Args:
+        log_path: ジョブのログファイル。
+    Returns:
+        subprocess.CompletedProcess: 実行結果。
+    """
+
+    batch_path = log_path.parent / "run_visible.bat"
+    if config.SAM_VISIBLE_CONSOLE:
+        # start /wait で別ウィンドウを出しつつ、Python 側は終了まで待ちます。
+        return subprocess.run(
+            ["cmd.exe", "/c", "start", "photo2mesh SAM/SAM3D", "/wait", str(batch_path)],
+            text=True,
+            check=False,
+        )
+
+    return subprocess.run(["cmd.exe", "/c", str(batch_path)], text=True, check=False)
 
 
 def _build_cuda_env() -> str:

@@ -22,4 +22,4 @@ mesh = output["glb"] # trimesh object
 # export gaussian splat
 #output["gs"].save_ply(f"splat.ply")
 mesh.export("my_mesh.ply")  # 頂点カラー付きで保存
-print("Your reconstruction has been saved to splat.ply")
+print("Your reconstruction has been saved to my_mesh.ply")

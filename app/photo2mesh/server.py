@@ -7,6 +7,7 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, sen
 from . import config
 from .jobs import allowed_file, create_job, get_job, list_jobs
 from .logging_utils import setup_logging
+from .model_gallery import ensure_thumbnail, get_model, list_models
 from .sam3d_runner import run_async
 
 
@@ -35,7 +36,7 @@ def create_app() -> Flask:
             str: ジョブ一覧を含むHTML。
         """
 
-        return render_template("index.html", jobs=list_jobs())
+        return render_template("index.html", jobs=list_jobs(), models=list_models()[:6])
 
     @app.post("/jobs")
     def submit_job():
@@ -49,9 +50,9 @@ def create_app() -> Flask:
 
         upload = request.files.get("photo")
         if upload is None or not upload.filename:
-            return render_template("index.html", jobs=list_jobs(), error="写真ファイルを選択してください。"), 400
+            return render_template("index.html", jobs=list_jobs(), models=list_models()[:6], error="写真ファイルを選択してください。"), 400
         if not allowed_file(upload.filename):
-            return render_template("index.html", jobs=list_jobs(), error="対応形式は png, jpg, jpeg, webp, bmp, tif, tiff です。"), 400
+            return render_template("index.html", jobs=list_jobs(), models=list_models()[:6], error="対応形式は png, jpg, jpeg, webp, bmp, tif, tiff です。"), 400
 
         job = create_job(upload)
         return redirect(url_for("job_detail", job_id=job.id))
@@ -166,6 +167,49 @@ def create_app() -> Flask:
         if job is None or not Path(job.output_path).exists():
             abort(404)
         return send_file(job.output_path, as_attachment=True, download_name=f"{job.id}.ply")
+
+    @app.get("/models")
+    def models_index():
+        """マイモデル一覧を表示します。
+
+        Args:
+            なし。
+        Returns:
+            str: サムネイル付きモデル一覧HTML。
+        """
+
+        return render_template("models.html", models=list_models())
+
+    @app.get("/models/<model_id>/thumbnail")
+    def model_thumbnail(model_id: str):
+        """PLY から作ったサムネイル画像を返します。
+
+        Args:
+            model_id: 表示したいモデルID。
+        Returns:
+            Response: PNG サムネイル画像。
+        """
+
+        model = get_model(model_id)
+        if model is None:
+            abort(404)
+        thumbnail_path = ensure_thumbnail(model)
+        return send_file(thumbnail_path, mimetype="image/png")
+
+    @app.get("/models/<model_id>/download")
+    def model_download(model_id: str):
+        """マイモデルから PLY をダウンロードさせます。
+
+        Args:
+            model_id: ダウンロードしたいモデルID。
+        Returns:
+            Response: PLY ファイルのダウンロードレスポンス。
+        """
+
+        model = get_model(model_id)
+        if model is None:
+            abort(404)
+        return send_file(model.ply_path, as_attachment=True, download_name=f"{model.id}.ply")
 
     @app.get("/jobs/<job_id>/log")
     def job_log(job_id: str):

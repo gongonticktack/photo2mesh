@@ -56,8 +56,9 @@ if "%PHOTO2MESH_PORT%"=="" set "PHOTO2MESH_PORT=7860"
 
 echo Starting photo2mesh at http://%PHOTO2MESH_HOST%:%PHOTO2MESH_PORT%
 echo Starting photo2mesh at http://%PHOTO2MESH_HOST%:%PHOTO2MESH_PORT% >> "%START_LOG%"
+echo Console output is also saved to %START_LOG%.
 
-python -m flask --app photo2mesh.server run --host %PHOTO2MESH_HOST% --port %PHOTO2MESH_PORT% >> "%START_LOG%" 2>&1
+python -m photo2mesh.flask_tee
 set "FLASK_EXIT=%ERRORLEVEL%"
 
 echo Flask server stopped with exit code %FLASK_EXIT%.

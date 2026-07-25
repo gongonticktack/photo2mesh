@@ -23,6 +23,7 @@ WSL_PROJECT_ROOT = os.environ.get("PHOTO2MESH_WSL_PROJECT_ROOT", "/mnt/e/Program
 SAM3D_WORKDIR = os.environ.get("SAM3D_WORKDIR", WSL_PROJECT_ROOT)
 SAM3D_CODE_ROOT = os.environ.get("SAM3D_CODE_ROOT", "/home/gonsgon/sam3D/sam-3d-objects")
 SAM3D_CHECKPOINT_ROOT = os.environ.get("SAM3D_CHECKPOINT_ROOT", "/mnt/e/Program/sam3D/checkpoints")
+SAM_VISIBLE_CONSOLE = os.environ.get("SAM_VISIBLE_CONSOLE", "1") != "0"
 SAM_CHECKPOINT = os.environ.get(
     "SAM_CHECKPOINT",
     f"{SAM3D_CHECKPOINT_ROOT}/sam_vit_h_4b8939.pth",
