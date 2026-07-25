@@ -7,82 +7,97 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-  <main class="shell">
-    <header class="app-header">
+  <div class="app-frame">
+    <aside class="sidebar">
       <a class="brand" href="{{ url_for('index') }}">
         <span class="brand-mark"></span>
-        <span>photo2mesh</span>
+        <span>
+          <strong>photo2mesh</strong>
+          <small>Local SAM3D Studio</small>
+        </span>
       </a>
-      <nav class="nav-links">
-        <a href="{{ url_for('index') }}">生成</a>
-        <a href="{{ url_for('models_index') }}">マイモデル</a>
+
+      <nav class="side-nav">
+        <a class="active" href="{{ url_for('index') }}"><span>H</span>ホーム</a>
+        <a href="{{ url_for('models_index') }}"><span>M</span>マイモデル</a>
       </nav>
-    </header>
 
-    <section class="panel">
-      <div class="section-head">
-        <p class="eyebrow">SAM3D PLY generator</p>
-        <h1>写真から3Dメッシュを生成</h1>
-        <p class="lead">画像をアップロードして、対象物を1クリック。mask 作成から PLY 出力までローカルで処理します。</p>
+      <div class="sidebar-card">
+        <strong>SAM3D Ready</strong>
+        <p>画像を選び、対象物を1クリックして PLY を作成します。</p>
       </div>
+    </aside>
 
-      {% if error %}
-      <p class="error">{{ error }}</p>
-      {% endif %}
-
-      <form class="upload" action="{{ url_for('submit_job') }}" method="post" enctype="multipart/form-data">
-        <label class="dropzone">
-          <input type="file" name="photo" accept="image/*" required>
-          <span class="dropzone-main">写真を選択</span>
-          <small>PNG / JPG / WEBP / BMP / TIFF</small>
-        </label>
-        <button type="submit">生成開始</button>
-      </form>
-    </section>
-
-    <section class="models-strip">
-      <div class="section-title-row">
+    <main class="workspace">
+      <header class="topbar">
         <div>
-          <p class="eyebrow">Generated assets</p>
-          <h2>マイモデル</h2>
+          <p class="eyebrow">SAM3D PLY generator</p>
+          <h1>写真から3Dメッシュを生成</h1>
         </div>
-        <a href="{{ url_for('models_index') }}">すべて見る</a>
-      </div>
-      {% if models %}
-      <div class="model-grid">
-        {% for model in models %}
-        <a class="model-tile" href="{{ url_for('model_download', model_id=model.id) }}">
-          <img src="{{ url_for('model_thumbnail', model_id=model.id) }}" alt="{{ model.name }}">
-          <span class="model-title">{{ model.name }}</span>
-          <span class="model-action">PLY をダウンロード</span>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="muted">生成された PLY がここに並びます。</p>
-      {% endif %}
-    </section>
+        <a class="button secondary" href="{{ url_for('models_index') }}">マイモデル</a>
+      </header>
 
-    <section class="history">
-      <div class="section-title-row">
-        <div>
-          <p class="eyebrow">Pipeline</p>
-          <h2>ジョブ履歴</h2>
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Local AI Mesh Pipeline</p>
+          <h2>対象物を、立体モデルへ。</h2>
+          <p class="lead">写真をアップロードしてから物体を1クリック。mask 作成、WSL 起動、conda activate、SAM3D 実行までローカルでつなぎます。</p>
+
+          {% if error %}
+          <p class="error">{{ error }}</p>
+          {% endif %}
+
+          <form class="prompt-upload" action="{{ url_for('submit_job') }}" method="post" enctype="multipart/form-data">
+            <label>
+              <input type="file" name="photo" accept="image/*" required>
+              <span>写真を選択</span>
+            </label>
+            <button type="submit">生成開始</button>
+          </form>
+
+          <div class="quick-tags">
+            <span>PNG</span>
+            <span>JPG</span>
+            <span>WEBP</span>
+            <span>BMP</span>
+            <span>TIFF</span>
+          </div>
         </div>
-      </div>
-      {% if jobs %}
-      <div class="job-list">
-        {% for job in jobs %}
-        <a class="job-row" href="{{ url_for('job_detail', job_id=job.id) }}">
-          <span class="job-name">{{ job.original_name }}</span>
-          <strong class="status {{ job.status }}">{{ job.status }}</strong>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="muted">まだジョブはありません。</p>
-      {% endif %}
-    </section>
-  </main>
+        <div class="hero-preview">
+          {% if models %}
+          <img src="{{ url_for('model_thumbnail', model_id=models[0].id) }}" alt="{{ models[0].name }}">
+          {% else %}
+          <div class="preview-placeholder">
+            <span>PLY</span>
+            <strong>Preview</strong>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="models-strip dashboard-card">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">Recent models</p>
+            <h2>マイモデル</h2>
+          </div>
+          <a href="{{ url_for('models_index') }}">すべて見る →</a>
+        </div>
+        {% if models %}
+        <div class="model-rail">
+          {% for model in models %}
+          <a class="model-tile" href="{{ url_for('model_download', model_id=model.id) }}">
+            <img src="{{ url_for('model_thumbnail', model_id=model.id) }}" alt="{{ model.name }}">
+            <span class="model-title">{{ model.name }}</span>
+            <span class="model-action">PLY をダウンロード</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">生成された PLY がここに横並びで表示されます。</p>
+        {% endif %}
+      </section>
+    </main>
+  </div>
 </body>
 </html>

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import math
-import random
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,7 @@ from . import config
 
 
 LOGGER = logging.getLogger(__name__)
+THUMBNAIL_RENDER_VERSION = "mesh-v3"
 
 PLY_TYPE_SIZES = {
     "char": 1,
@@ -69,6 +69,21 @@ class ModelAsset:
     ply_path: Path
     thumbnail_path: Path
     created_at: float
+
+
+@dataclass
+class MeshPreview:
+    """PLY サムネイル描画に使うメッシュ情報です。
+
+    Args:
+        vertices: 頂点の座標と色。
+        faces: 三角面の頂点番号。
+    Returns:
+        MeshPreview: サムネイル描画用の軽いメッシュ情報。
+    """
+
+    vertices: list[tuple[float, float, float, tuple[int, int, int]]]
+    faces: list[tuple[int, int, int]]
 
 
 def list_models() -> list[ModelAsset]:
@@ -131,17 +146,36 @@ def ensure_thumbnail(model: ModelAsset) -> Path:
         Path: 作成済みサムネイル画像のパス。
     """
 
-    if model.thumbnail_path.exists() and model.thumbnail_path.stat().st_mtime >= model.ply_path.stat().st_mtime:
+    version_path = _thumbnail_version_path(model)
+    if (
+        model.thumbnail_path.exists()
+        and version_path.exists()
+        and version_path.read_text(encoding="utf-8") == THUMBNAIL_RENDER_VERSION
+        and model.thumbnail_path.stat().st_mtime >= model.ply_path.stat().st_mtime
+    ):
         return model.thumbnail_path
 
     try:
-        points = _read_ply_points(model.ply_path)
-        _render_thumbnail(points, model.thumbnail_path)
+        mesh = _read_ply_mesh(model.ply_path)
+        _render_thumbnail(mesh, model.thumbnail_path)
     except (OSError, KeyError, ValueError, struct.error) as exc:
         # PLY の形式が想定外でも、一覧画面が止まらないようにします。
         LOGGER.exception("Failed to render thumbnail for %s", model.ply_path)
-        _render_thumbnail([], model.thumbnail_path, f"preview failed: {exc}")
+        _render_thumbnail(MeshPreview(vertices=[], faces=[]), model.thumbnail_path, f"preview failed: {exc}")
+    version_path.write_text(THUMBNAIL_RENDER_VERSION, encoding="utf-8")
     return model.thumbnail_path
+
+
+def _thumbnail_version_path(model: ModelAsset) -> Path:
+    """サムネイルの描画方式を記録するファイルパスを返します。
+
+    Args:
+        model: サムネイルを作りたいモデル。
+    Returns:
+        Path: 描画バージョンを書いておくファイルパス。
+    """
+
+    return model.thumbnail_path.with_suffix(".version")
 
 
 def _thumbnail_dir() -> Path:
@@ -178,14 +212,14 @@ def _model_name(model_id: str) -> str:
         return f"{model_id}.ply"
 
 
-def _read_ply_points(ply_path: Path, max_points: int = 120_000) -> list[tuple[float, float, float, tuple[int, int, int]]]:
-    """PLY からサムネイルに使う頂点を読みます。
+def _read_ply_mesh(ply_path: Path, max_faces: int = 750_000) -> MeshPreview:
+    """PLY からサムネイルに使うメッシュを読みます。
 
     Args:
         ply_path: 読みたい PLY ファイル。
-        max_points: 読み込む頂点の最大数。
+        max_faces: 読み込む三角面の最大数。
     Returns:
-        list[tuple[float, float, float, tuple[int, int, int]]]: 座標と色の一覧。
+        MeshPreview: 頂点と三角面の一覧。
     """
 
     with ply_path.open("rb") as file:
@@ -202,9 +236,9 @@ def _read_ply_points(ply_path: Path, max_points: int = 120_000) -> list[tuple[fl
 
     info = _parse_ply_header(header_lines)
     if info["format"] == "ascii":
-        return _read_ascii_vertices(ply_path, len(header_lines), info, max_points)
+        return _read_ascii_mesh(ply_path, len(header_lines), info, max_faces)
     if info["format"] == "binary_little_endian":
-        return _read_binary_vertices(ply_path, data_start, info, max_points)
+        return _read_binary_mesh(ply_path, data_start, info, max_faces)
     raise ValueError(f"Unsupported PLY format: {info['format']}")
 
 
@@ -219,7 +253,9 @@ def _parse_ply_header(header_lines: list[str]) -> dict:
 
     ply_format = ""
     vertex_count = 0
+    face_count = 0
     vertex_properties: list[tuple[str, str]] = []
+    face_properties: list[list[str]] = []
     current_element = ""
 
     for line in header_lines:
@@ -232,83 +268,87 @@ def _parse_ply_header(header_lines: list[str]) -> dict:
             current_element = parts[1]
             if current_element == "vertex":
                 vertex_count = int(parts[2])
+            elif current_element == "face":
+                face_count = int(parts[2])
         elif parts[0] == "property" and current_element == "vertex" and parts[1] != "list":
             vertex_properties.append((parts[1], parts[2]))
+        elif parts[0] == "property" and current_element == "face":
+            face_properties.append(parts[1:])
 
     return {
         "format": ply_format,
         "vertex_count": vertex_count,
+        "face_count": face_count,
         "vertex_properties": vertex_properties,
+        "face_properties": face_properties,
     }
 
 
-def _read_binary_vertices(
+def _read_binary_mesh(
     ply_path: Path,
     data_start: int,
     info: dict,
-    max_points: int,
-) -> list[tuple[float, float, float, tuple[int, int, int]]]:
-    """binary_little_endian PLY の頂点を読みます。
+    max_faces: int,
+) -> MeshPreview:
+    """binary_little_endian PLY の頂点と面を読みます。
 
     Args:
         ply_path: 読みたい PLY ファイル。
         data_start: 頂点データが始まるバイト位置。
         info: PLY ヘッダーから作った情報。
-        max_points: 読み込む頂点の最大数。
+        max_faces: 読み込む三角面の最大数。
     Returns:
-        list[tuple[float, float, float, tuple[int, int, int]]]: 座標と色の一覧。
+        MeshPreview: 頂点と三角面の一覧。
     """
 
     properties = info["vertex_properties"]
     record_size = sum(PLY_TYPE_SIZES[property_type] for property_type, _ in properties)
     offsets = _property_offsets(properties)
-    stride = max(1, math.ceil(info["vertex_count"] / max_points))
-    points = []
+    vertices = []
 
     with ply_path.open("rb") as file:
-        for index in range(0, info["vertex_count"], stride):
-            file.seek(data_start + index * record_size)
+        file.seek(data_start)
+        for _ in range(info["vertex_count"]):
             record = file.read(record_size)
             if len(record) < record_size:
                 break
-            points.append(_decode_binary_vertex(record, properties, offsets))
+            vertices.append(_decode_binary_vertex(record, properties, offsets))
 
-    return points
+        faces = _read_binary_faces(file, info, max_faces)
+
+    return MeshPreview(vertices=vertices, faces=faces)
 
 
-def _read_ascii_vertices(
+def _read_ascii_mesh(
     ply_path: Path,
     header_line_count: int,
     info: dict,
-    max_points: int,
-) -> list[tuple[float, float, float, tuple[int, int, int]]]:
-    """ASCII PLY の頂点を読みます。
+    max_faces: int,
+) -> MeshPreview:
+    """ASCII PLY の頂点と面を読みます。
 
     Args:
         ply_path: 読みたい PLY ファイル。
         header_line_count: ヘッダーの行数。
         info: PLY ヘッダーから作った情報。
-        max_points: 読み込む頂点の最大数。
+        max_faces: 読み込む三角面の最大数。
     Returns:
-        list[tuple[float, float, float, tuple[int, int, int]]]: 座標と色の一覧。
+        MeshPreview: 頂点と三角面の一覧。
     """
 
-    stride = max(1, math.ceil(info["vertex_count"] / max_points))
     property_names = [name for _, name in info["vertex_properties"]]
-    points = []
+    vertices = []
 
     with ply_path.open("r", encoding="ascii", errors="replace") as file:
         for _ in range(header_line_count):
             next(file)
-        for index in range(info["vertex_count"]):
+        for _ in range(info["vertex_count"]):
             line = file.readline()
             if not line:
                 break
-            if index % stride != 0:
-                continue
             values = line.split()
             value_map = dict(zip(property_names, values))
-            points.append(
+            vertices.append(
                 (
                     float(value_map["x"]),
                     float(value_map["y"]),
@@ -316,8 +356,72 @@ def _read_ascii_vertices(
                     _vertex_color(value_map),
                 )
             )
+        faces = _read_ascii_faces(file, info, max_faces)
 
-    return points
+    return MeshPreview(vertices=vertices, faces=faces)
+
+
+def _read_binary_faces(file, info: dict, max_faces: int) -> list[tuple[int, int, int]]:
+    """binary PLY の面を読み、三角形だけにします。
+
+    Args:
+        file: 面データの先頭にいるファイルオブジェクト。
+        info: PLY ヘッダーから作った情報。
+        max_faces: 読み込む三角面の最大数。
+    Returns:
+        list[tuple[int, int, int]]: 三角面の頂点番号。
+    """
+
+    stride = max(1, math.ceil(max(info["face_count"], 1) / max_faces))
+    faces = []
+    for index in range(info["face_count"]):
+        count_raw = file.read(1)
+        if not count_raw:
+            break
+        vertex_count = struct.unpack("<B", count_raw)[0]
+        indices = list(struct.unpack("<" + "i" * vertex_count, file.read(4 * vertex_count)))
+        if index % stride == 0:
+            faces.extend(_triangulate(indices))
+    return faces[:max_faces]
+
+
+def _read_ascii_faces(file, info: dict, max_faces: int) -> list[tuple[int, int, int]]:
+    """ASCII PLY の面を読み、三角形だけにします。
+
+    Args:
+        file: 面データの先頭にいるファイルオブジェクト。
+        info: PLY ヘッダーから作った情報。
+        max_faces: 読み込む三角面の最大数。
+    Returns:
+        list[tuple[int, int, int]]: 三角面の頂点番号。
+    """
+
+    stride = max(1, math.ceil(max(info["face_count"], 1) / max_faces))
+    faces = []
+    for index in range(info["face_count"]):
+        line = file.readline()
+        if not line:
+            break
+        values = [int(value) for value in line.split()]
+        if not values:
+            continue
+        if index % stride == 0:
+            faces.extend(_triangulate(values[1 : 1 + values[0]]))
+    return faces[:max_faces]
+
+
+def _triangulate(indices: list[int]) -> list[tuple[int, int, int]]:
+    """多角形の面を三角形へ分けます。
+
+    Args:
+        indices: 1つの面を作る頂点番号。
+    Returns:
+        list[tuple[int, int, int]]: 三角形の頂点番号。
+    """
+
+    if len(indices) < 3:
+        return []
+    return [(indices[0], indices[index], indices[index + 1]) for index in range(1, len(indices) - 1)]
 
 
 def _property_offsets(properties: list[tuple[str, str]]) -> dict[str, int]:
@@ -398,14 +502,14 @@ def _vertex_color(value_map: dict[str, str]) -> tuple[int, int, int]:
 
 
 def _render_thumbnail(
-    points: list[tuple[float, float, float, tuple[int, int, int]]],
+    mesh: MeshPreview,
     output_path: Path,
     message: str = "",
 ) -> None:
     """頂点を画面いっぱいに入るサムネイルへ描きます。
 
     Args:
-        points: PLY から読んだ座標と色。
+        mesh: PLY から読んだ頂点と面。
         output_path: PNG の保存先。
         message: 点を描けない時に画像へ入れる短い文。
     Returns:
@@ -416,21 +520,71 @@ def _render_thumbnail(
     image = _thumbnail_background(width, height)
     draw = ImageDraw.Draw(image, "RGBA")
 
-    if not points:
+    if not mesh.vertices:
         if message:
             draw.text((28, height - 52), message[:90], fill=(255, 184, 107, 220))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         image.save(output_path)
         return
 
-    projected = _project_points(points, width, height)
+    projected = _project_vertices(mesh.vertices, width, height)
+    if mesh.faces:
+        _draw_mesh_faces(draw, projected, mesh.faces)
+    else:
+        # 面がないPLYだけ、最後の手段として点で描きます。
+        _draw_vertex_points(draw, projected)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output_path)
+
+
+def _draw_mesh_faces(
+    draw: ImageDraw.ImageDraw,
+    projected: list[tuple[float, float, float, tuple[int, int, int]]],
+    faces: list[tuple[int, int, int]],
+) -> None:
+    """三角面を色付きで描きます。
+
+    Args:
+        draw: Pillow の描画オブジェクト。
+        projected: 画面上の頂点座標。
+        faces: 三角面の頂点番号。
+    Returns:
+        None: 画像へ描くだけで、値は返しません。
+    """
+
+    drawable_faces = []
+    for first, second, third in faces:
+        if max(first, second, third) >= len(projected) or min(first, second, third) < 0:
+            continue
+        points = [projected[first], projected[second], projected[third]]
+        depth = sum(point[2] for point in points) / 3
+        color = tuple(int(sum(point[3][channel] for point in points) / 3) for channel in range(3))
+        drawable_faces.append((depth, points, color))
+
+    # 奥にある面から塗ると、手前の面が自然に見えます。
+    for depth, points, color in sorted(drawable_faces, key=lambda item: item[0]):
+        alpha = 220 + int(35 * depth)
+        draw.polygon([(point[0], point[1]) for point in points], fill=(*color, alpha))
+
+
+def _draw_vertex_points(
+    draw: ImageDraw.ImageDraw,
+    projected: list[tuple[float, float, float, tuple[int, int, int]]],
+) -> None:
+    """面がないPLYを点で描きます。
+
+    Args:
+        draw: Pillow の描画オブジェクト。
+        projected: 画面上の頂点座標。
+    Returns:
+        None: 画像へ描くだけで、値は返しません。
+    """
+
     for x, y, depth, color in sorted(projected, key=lambda item: item[2]):
         alpha = 155 + int(80 * depth)
         radius = 1 if len(projected) > 60_000 else 2
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(*color, alpha))
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output_path)
 
 
 def _thumbnail_background(width: int, height: int) -> Image.Image:
@@ -453,22 +607,22 @@ def _thumbnail_background(width: int, height: int) -> Image.Image:
     return image
 
 
-def _project_points(
-    points: list[tuple[float, float, float, tuple[int, int, int]]],
+def _project_vertices(
+    vertices: list[tuple[float, float, float, tuple[int, int, int]]],
     width: int,
     height: int,
 ) -> list[tuple[float, float, float, tuple[int, int, int]]]:
     """3D 頂点をサムネイル上の2D位置に変換します。
 
     Args:
-        points: PLY から読んだ座標と色。
+        vertices: PLY から読んだ座標と色。
         width: サムネイル幅。
         height: サムネイル高さ。
     Returns:
         list[tuple[float, float, float, tuple[int, int, int]]]: 画面座標、奥行き、色。
     """
 
-    sampled = points if len(points) <= 120_000 else random.sample(points, 120_000)
+    sampled = vertices
     xs = [point[0] for point in sampled]
     ys = [point[1] for point in sampled]
     zs = [point[2] for point in sampled]

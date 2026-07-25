@@ -8,18 +8,28 @@
   <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body data-job-id="{{ job.id }}">
-  <main class="shell">
-    <header class="app-header">
+  <div class="app-frame">
+    <aside class="sidebar">
       <a class="brand" href="{{ url_for('index') }}">
         <span class="brand-mark"></span>
-        <span>photo2mesh</span>
+        <span>
+          <strong>photo2mesh</strong>
+          <small>Local SAM3D Studio</small>
+        </span>
       </a>
-      <nav class="nav-links">
-        <a href="{{ url_for('index') }}">生成</a>
-        <a href="{{ url_for('models_index') }}">マイモデル</a>
-      </nav>
-    </header>
 
+      <nav class="side-nav">
+        <a href="{{ url_for('index') }}"><span>H</span>ホーム</a>
+        <a href="{{ url_for('models_index') }}"><span>M</span>マイモデル</a>
+      </nav>
+
+      <div class="sidebar-card">
+        <strong>Job Monitor</strong>
+        <p>mask 作成と SAM3D 実行ログをこの画面から確認できます。</p>
+      </div>
+    </aside>
+
+    <main class="workspace">
     <section class="panel compact">
       <a class="back" href="{{ url_for('index') }}">戻る</a>
       <div class="section-head">
@@ -45,6 +55,7 @@
         <a id="log-link" class="button secondary" href="{{ url_for('job_log', job_id=job.id) }}">ログを見る</a>
       </div>
     </section>
-  </main>
+    </main>
+  </div>
 </body>
 </html>

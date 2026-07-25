@@ -7,43 +7,56 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-  <main class="shell">
-    <header class="app-header">
+  <div class="app-frame">
+    <aside class="sidebar">
       <a class="brand" href="{{ url_for('index') }}">
         <span class="brand-mark"></span>
-        <span>photo2mesh</span>
+        <span>
+          <strong>photo2mesh</strong>
+          <small>Local SAM3D Studio</small>
+        </span>
       </a>
-      <nav class="nav-links">
-        <a href="{{ url_for('index') }}">生成</a>
-        <a href="{{ url_for('models_index') }}">マイモデル</a>
+
+      <nav class="side-nav">
+        <a href="{{ url_for('index') }}"><span>H</span>ホーム</a>
+        <a class="active" href="{{ url_for('models_index') }}"><span>M</span>マイモデル</a>
       </nav>
-    </header>
 
-    <section class="panel">
-      <div class="section-head">
-        <p class="eyebrow">My Models</p>
-        <h1>マイモデル</h1>
-        <p class="lead">生成済みの PLY をサムネイルで確認できます。画像をクリックすると PLY をダウンロードします。</p>
+      <div class="sidebar-card">
+        <strong>My Models</strong>
+        <p>クリックしたサムネイルの PLY をすぐにダウンロードできます。</p>
       </div>
+    </aside>
 
-      {% if models %}
-      <div class="gallery-toolbar">
-        <span>{{ models|length }} models</span>
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">My Models</p>
+          <h1>マイモデル</h1>
+          <p class="lead">生成済みの PLY を横並びで確認できます。画像をクリックすると PLY をダウンロードします。</p>
+        </div>
         <a class="button secondary" href="{{ url_for('index') }}">新しく生成</a>
-      </div>
-      <div class="model-grid full">
-        {% for model in models %}
-        <a class="model-tile" href="{{ url_for('model_download', model_id=model.id) }}">
-          <img src="{{ url_for('model_thumbnail', model_id=model.id) }}" alt="{{ model.name }}">
-          <span class="model-title">{{ model.name }}</span>
-          <span class="model-action">PLY をダウンロード</span>
-        </a>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="muted">まだ生成済みモデルはありません。</p>
-      {% endif %}
-    </section>
-  </main>
+      </header>
+
+      <section class="dashboard-card gallery-page">
+        <div class="gallery-toolbar">
+          <span>{{ models|length }} models</span>
+        </div>
+        {% if models %}
+        <div class="model-library">
+          {% for model in models %}
+          <a class="model-tile" href="{{ url_for('model_download', model_id=model.id) }}">
+            <img src="{{ url_for('model_thumbnail', model_id=model.id) }}" alt="{{ model.name }}">
+            <span class="model-title">{{ model.name }}</span>
+            <span class="model-action">PLY をダウンロード</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">まだ生成済みモデルはありません。</p>
+        {% endif %}
+      </section>
+    </main>
+  </div>
 </body>
 </html>
