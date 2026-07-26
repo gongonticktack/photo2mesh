@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>photo2mesh</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body>
   <div class="app-frame">
@@ -13,7 +14,7 @@
         <span class="brand-mark"></span>
         <span>
           <strong>photo2mesh</strong>
-          <small>Local SAM3D Studio</small>
+          <small>SAM + SAM3D Studio</small>
         </span>
       </a>
 
@@ -23,15 +24,15 @@
       </nav>
 
       <div class="sidebar-card">
-        <strong>SAM3D Ready</strong>
-        <p>画像を選び、対象物を1クリックして PLY を作成します。</p>
+        <strong>SAM / SAM3D Ready</strong>
+        <p>SAMで対象物を選び、SAM3Dで色付きメッシュPLYを作成します。</p>
       </div>
     </aside>
 
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">SAM3D PLY generator</p>
+          <p class="eyebrow">Powered by SAM + SAM3D</p>
           <h1>写真から3Dメッシュを生成</h1>
         </div>
         <a class="button secondary" href="{{ url_for('models_index') }}">マイモデル</a>
@@ -39,7 +40,7 @@
 
       <section class="hero-panel">
         <div class="hero-copy">
-          <p class="eyebrow">Local AI Mesh Pipeline</p>
+          <p class="eyebrow">SAM segmentation / SAM3D reconstruction</p>
           <h2>対象物を、立体モデルへ。</h2>
           <p class="lead">写真をアップロードしてから物体を1クリック。mask 作成、WSL 起動、conda activate、SAM3D 実行までローカルでつなぎます。</p>
 
@@ -49,8 +50,8 @@
 
           <form class="prompt-upload" action="{{ url_for('submit_job') }}" method="post" enctype="multipart/form-data">
             <label>
-              <input type="file" name="photo" accept="image/*" required>
-              <span>写真を選択</span>
+              <input id="photo-input" type="file" name="photo" accept="image/*" required>
+              <span id="photo-file-name">写真を選択</span>
             </label>
             <button type="submit">生成開始</button>
           </form>
@@ -62,17 +63,47 @@
             <span>BMP</span>
             <span>TIFF</span>
           </div>
+
         </div>
         <div class="hero-preview">
           {% if models %}
-          <img src="{{ url_for('model_thumbnail', model_id=models[0].id) }}" alt="{{ models[0].name }}">
+          <img id="upload-preview-image" src="{{ url_for('model_thumbnail', model_id=models[0].id) }}" alt="{{ models[0].name }}">
+          <div id="upload-preview-placeholder" class="preview-placeholder hidden">
+            <span>IMG</span>
+            <strong>Upload Preview</strong>
+          </div>
           {% else %}
-          <div class="preview-placeholder">
+          <img id="upload-preview-image" class="hidden" src="" alt="選択した写真のプレビュー">
+          <div id="upload-preview-placeholder" class="preview-placeholder">
             <span>PLY</span>
             <strong>Preview</strong>
           </div>
           {% endif %}
         </div>
+      </section>
+
+      <section class="workflow-cards">
+        <article>
+          <span class="workflow-icon">01</span>
+          <div>
+            <strong>写真をアップロード</strong>
+            <p>生成したい物体が写った画像を選びます。</p>
+          </div>
+        </article>
+        <article>
+          <span class="workflow-icon">02</span>
+          <div>
+            <strong>SAM で対象物を選択</strong>
+            <p>クリック位置から mask を作成します。</p>
+          </div>
+        </article>
+        <article>
+          <span class="workflow-icon">03</span>
+          <div>
+            <strong>SAM3D で PLY 出力</strong>
+            <p>色付きメッシュを output に保存します。</p>
+          </div>
+        </article>
       </section>
 
       <section class="models-strip dashboard-card">

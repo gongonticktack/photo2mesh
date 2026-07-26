@@ -47,6 +47,10 @@ body::before {
   content: "";
 }
 
+body[data-job-id] {
+  overflow: auto;
+}
+
 .shell {
   width: min(1040px, calc(100% - 32px));
   margin: 0 auto;
@@ -80,11 +84,20 @@ body::before {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 14px;
   min-width: 0;
   min-height: 0;
   padding: 0;
+}
+
+body[data-job-id] .workspace {
+  display: block;
+  overflow: visible;
+}
+
+body[data-job-id] .panel {
+  max-height: none;
 }
 
 .topbar {
@@ -298,7 +311,7 @@ body::before {
   grid-template-columns: minmax(0, 1fr) minmax(260px, 42%);
   gap: 26px;
   min-height: 0;
-  padding: 28px 34px;
+  padding: 24px 32px;
   background:
     linear-gradient(90deg, rgba(10, 16, 19, 0.94), rgba(10, 16, 19, 0.54)),
     radial-gradient(circle at 76% 42%, rgba(57, 215, 200, 0.18), transparent 36%),
@@ -310,12 +323,12 @@ body::before {
   z-index: 1;
   display: grid;
   align-content: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .hero-copy h2 {
   max-width: 540px;
-  font-size: 40px;
+  font-size: 36px;
   line-height: 1.12;
 }
 
@@ -324,7 +337,7 @@ body::before {
   z-index: 1;
   display: grid;
   place-items: center;
-  min-height: 220px;
+  min-height: 190px;
   overflow: hidden;
   border: 1px solid rgba(57, 215, 200, 0.22);
   border-radius: 8px;
@@ -336,8 +349,13 @@ body::before {
 .hero-preview img {
   width: 100%;
   height: 100%;
-  min-height: 220px;
+  min-height: 190px;
   object-fit: cover;
+}
+
+#upload-preview-image {
+  position: relative;
+  z-index: 1;
 }
 
 .preview-placeholder {
@@ -455,6 +473,54 @@ h2 {
   background: rgba(255, 255, 255, 0.055);
   font-size: 12px;
   font-weight: 800;
+}
+
+.workflow-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.workflow-cards article {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 88px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(57, 215, 200, 0.1), transparent 58%),
+    rgba(10, 16, 19, 0.74);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.workflow-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(57, 215, 200, 0.34);
+  border-radius: 8px;
+  color: var(--accent);
+  background: rgba(57, 215, 200, 0.1);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.workflow-cards strong {
+  display: block;
+  font-size: 14px;
+}
+
+.workflow-cards p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .feature-row {
@@ -815,6 +881,8 @@ button:hover,
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 20px;
+  position: relative;
+  z-index: 2;
 }
 
 .mask-tool {
@@ -905,6 +973,7 @@ button:hover,
 
   .topbar,
   .hero-panel,
+  .workflow-cards,
   .feature-row,
   .prompt-upload {
     grid-template-columns: 1fr;

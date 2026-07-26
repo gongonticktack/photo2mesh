@@ -14,7 +14,7 @@
         <span class="brand-mark"></span>
         <span>
           <strong>photo2mesh</strong>
-          <small>Local SAM3D Studio</small>
+          <small>SAM + SAM3D Studio</small>
         </span>
       </a>
 
@@ -24,8 +24,8 @@
       </nav>
 
       <div class="sidebar-card">
-        <strong>Job Monitor</strong>
-        <p>mask 作成と SAM3D 実行ログをこの画面から確認できます。</p>
+        <strong>SAM / SAM3D Job</strong>
+        <p>SAMのmask作成とSAM3DのPLY生成ログを確認できます。</p>
       </div>
     </aside>
 
@@ -33,7 +33,7 @@
     <section class="panel compact">
       <a class="back" href="{{ url_for('index') }}">戻る</a>
       <div class="section-head">
-        <p class="eyebrow">Job {{ job.id }}</p>
+        <p class="eyebrow">SAM + SAM3D Job {{ job.id }}</p>
         <h1>{{ job.original_name }}</h1>
       </div>
       <div class="state-line">
@@ -47,7 +47,7 @@
           <img id="mask-preview" class="mask-preview{% if not mask_exists %} hidden{% endif %}" src="{{ url_for('job_mask', job_id=job.id) if mask_exists else '' }}" alt="mask preview">
           <span id="click-marker" class="click-marker hidden"></span>
         </div>
-        <p class="muted">メッシュ化したい物体を1クリックしてください。</p>
+        <p class="muted">SAMで切り出したい物体を1クリックしてください。その後SAM3Dでメッシュ化します。</p>
       </div>
       <div class="actions">
         <button id="mask-button" type="button" class="button secondary disabled">クリック位置で生成</button>

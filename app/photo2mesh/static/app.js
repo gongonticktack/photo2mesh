@@ -7,7 +7,12 @@ const maskPreview = document.querySelector("#mask-preview");
 const imageStage = document.querySelector("#image-stage");
 const clickMarker = document.querySelector("#click-marker");
 const maskButton = document.querySelector("#mask-button");
+const photoInput = document.querySelector("#photo-input");
+const photoFileName = document.querySelector("#photo-file-name");
+const uploadPreviewImage = document.querySelector("#upload-preview-image");
+const uploadPreviewPlaceholder = document.querySelector("#upload-preview-placeholder");
 let selectedPoint = null;
+let uploadPreviewUrl = null;
 
 /**
  * 画像上で押した場所を、元画像のピクセル座標に変換します。
@@ -38,6 +43,28 @@ function showClickMarker(point) {
   clickMarker.style.left = `${point.markerX}px`;
   clickMarker.style.top = `${point.markerY}px`;
   clickMarker.classList.remove("hidden");
+}
+
+/**
+ * 選んだ写真を、生成開始前に画面へ表示します。
+ *
+ * Args:
+ *   file: ユーザーが選んだ画像ファイル。
+ * Returns:
+ *   void: 画面を書き換えるだけで、値は返しません。
+ */
+function showUploadPreview(file) {
+  if (!file || !uploadPreviewImage) return;
+
+  // 前のプレビューURLを片付けて、ブラウザのメモリを無駄にしないようにします。
+  if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+  uploadPreviewUrl = URL.createObjectURL(file);
+
+  uploadPreviewImage.src = uploadPreviewUrl;
+  uploadPreviewImage.alt = file.name;
+  uploadPreviewImage.classList.remove("hidden");
+  if (uploadPreviewPlaceholder) uploadPreviewPlaceholder.classList.add("hidden");
+  if (photoFileName) photoFileName.textContent = file.name;
 }
 
 /**
@@ -127,6 +154,13 @@ if (imageStage && sourceImage) {
 
 if (maskButton) {
   maskButton.addEventListener("click", submitMaskPoint);
+}
+
+if (photoInput) {
+  photoInput.addEventListener("change", () => {
+    const file = photoInput.files && photoInput.files[0];
+    showUploadPreview(file);
+  });
 }
 
 refreshJob();
